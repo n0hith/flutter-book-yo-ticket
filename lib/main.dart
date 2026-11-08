@@ -145,7 +145,7 @@ class MovieApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const slide = CupertinoPageTransitionsBuilder();
+    final slide = CupertinoPageTransitionsBuilder();
     return MaterialApp(
       title: 'Showtime',
       debugShowCheckedModeBanner: false,
@@ -155,7 +155,7 @@ class MovieApp extends StatelessWidget {
         colorSchemeSeed: kBlue,
         scaffoldBackgroundColor: kBg,
         // iOS-style slide between screens
-        pageTransitionsTheme: const PageTransitionsTheme(builders: {
+        pageTransitionsTheme: PageTransitionsTheme(builders: {
           TargetPlatform.android: slide,
           TargetPlatform.iOS: slide,
           TargetPlatform.macOS: slide,
