@@ -1,14 +1,15 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 
 void main() => runApp(const MovieApp());
 
-// ---------- Letterboxd-style colors ----------
-const kBg = Color(0xFF14181C);
-const kCard = Color(0xFF1F252B);
-const kText = Color(0xFF99AABB);
-const kGreen = Color(0xFF00E054);
-const kOrange = Color(0xFFFF8000);
-const kBlue = Color(0xFF40BCF4);
+// ---------- Apple-style colors ----------
+const kBg = Color(0xFF000000);
+const kCard = Color(0xFF1C1C1E);
+const kFill = Color(0xFF2C2C2E);
+const kGray = Color(0xFF8E8E93);
+const kBlue = Color(0xFF0A84FF);
+const kGreen = Color(0xFF30D158);
 
 // ---------- Data ----------
 class Movie {
@@ -19,9 +20,13 @@ class Movie {
       this.poster, this.about);
 }
 
+// A poster can be a full link (https...) or a TMDB path (/abc.jpg)
+String posterUrl(String p) =>
+    p.startsWith('http') ? p : 'https://image.tmdb.org/t/p/w500$p';
+
 const List<Movie> movies = [
   Movie('The Odyssey', 2026, 8.2, 'Adventure • Drama', '2h 52m',
-      '/odyssey.jpg',
+      'https://m.media-amazon.com/images/M/MV5BNTcyNmJlZmQtNDUwYy00NDBjLTg1NGQtYTY2Y2UxMWM3NmI1XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg',
       'Odysseus, a Greek king, fights his way home after the Trojan War in Christopher Nolan\'s epic.'),
   Movie('The Dark Knight', 2008, 9.0, 'Action • Crime', '2h 32m',
       '/qJ2tW6WMUDux911r6m7haRef0WH.jpg',
@@ -45,7 +50,7 @@ const List<Movie> movies = [
       '/uqx37cS8cpHg8U35f9U5IBlrCV3.jpg',
       'A squad of soldiers goes behind enemy lines to bring one paratrooper home.'),
   Movie('Sinners', 2025, 7.5, 'Horror • Thriller', '2h 17m',
-      '/sinners.jpg',
+      'https://upload.wikimedia.org/wikipedia/en/5/5f/Sinners_%282025_film%29_poster.jpg',
       'Twin brothers return to their hometown in the 1930s South and face a terrifying evil.'),
   Movie('Joker', 2019, 8.4, 'Crime • Drama', '2h 02m',
       '/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg',
@@ -140,26 +145,40 @@ class MovieApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const slide = CupertinoPageTransitionsBuilder();
     return MaterialApp(
-      title: 'Cinebox',
+      title: 'Showtime',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        colorSchemeSeed: kGreen,
+        colorSchemeSeed: kBlue,
         scaffoldBackgroundColor: kBg,
+        // iOS-style slide between screens
+        pageTransitionsTheme: const PageTransitionsTheme(builders: {
+          TargetPlatform.android: slide,
+          TargetPlatform.iOS: slide,
+          TargetPlatform.macOS: slide,
+          TargetPlatform.windows: slide,
+          TargetPlatform.linux: slide,
+          TargetPlatform.fuchsia: slide,
+        }),
         appBarTheme: const AppBarTheme(
-          backgroundColor: kBg,
+          backgroundColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+              fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            backgroundColor: kGreen,
-            foregroundColor: Colors.black,
-            minimumSize: const Size(0, 48),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            backgroundColor: kBlue,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(0, 52),
+            shape: const StadiumBorder(),
+            textStyle:
+                const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
         ),
       ),
@@ -184,49 +203,18 @@ class Narrow extends StatelessWidget {
   }
 }
 
-// Small uppercase heading with a line under it
-class SectionHeader extends StatelessWidget {
-  final String text;
-  const SectionHeader(this.text, {super.key});
+// Frosted-glass bar (blurs what is behind it)
+class Glass extends StatelessWidget {
+  final Widget child;
+  const Glass({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(text.toUpperCase(),
-            style: const TextStyle(
-                color: kText,
-                fontSize: 12,
-                letterSpacing: 1.3,
-                fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        const Divider(height: 1, color: Colors.white24),
-      ],
-    );
-  }
-}
-
-// Green star rating (out of 5, like Letterboxd)
-class Stars extends StatelessWidget {
-  final double rating;
-  final double size;
-  const Stars(this.rating, {super.key, this.size = 14});
-
-  @override
-  Widget build(BuildContext context) {
-    final five = rating / 2;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(5, (i) {
-        IconData icon = Icons.star_border;
-        if (five >= i + 1) {
-          icon = Icons.star;
-        } else if (five >= i + 0.5) {
-          icon = Icons.star_half;
-        }
-        return Icon(icon, size: size, color: kGreen);
-      }),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(color: const Color(0xCC1C1C1E), child: child),
+      ),
     );
   }
 }
@@ -234,22 +222,24 @@ class Stars extends StatelessWidget {
 // Poster image with a fallback if the image fails to load
 class Poster extends StatelessWidget {
   final Movie movie;
-  const Poster(this.movie, {super.key});
+  final double radius;
+  const Poster(this.movie, {super.key, this.radius = 16});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: kCard,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.white24),
+        borderRadius: BorderRadius.circular(radius),
       ),
       clipBehavior: Clip.antiAlias,
       child: Image.network(
-        'https://image.tmdb.org/t/p/w500${movie.poster}',
+        posterUrl(movie.poster),
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
+        // If the site blocks the image, load it a different way
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
         errorBuilder: (context, error, stack) => Container(
           color: kCard,
           alignment: Alignment.center,
@@ -257,7 +247,8 @@ class Poster extends StatelessWidget {
           child: Text(
             movie.title,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            style: const TextStyle(
+                fontWeight: FontWeight.w600, fontSize: 12, color: kGray),
           ),
         ),
       ),
@@ -273,11 +264,12 @@ class InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: kText)),
+          Text(label, style: const TextStyle(color: kGray)),
           const SizedBox(width: 16),
           Flexible(
             child: Text(
@@ -285,7 +277,7 @@ class InfoRow extends StatelessWidget {
               textAlign: TextAlign.right,
               style: TextStyle(
                   fontWeight: bold ? FontWeight.bold : FontWeight.w500,
-                  fontSize: bold ? 18 : 14),
+                  fontSize: bold ? 20 : 15),
             ),
           ),
         ],
@@ -308,13 +300,6 @@ class _HomePageState extends State<HomePage> {
   ];
   String selected = 'All';
 
-  Widget dot(Color c) => Container(
-        width: 14,
-        height: 14,
-        margin: const EdgeInsets.only(right: 3),
-        decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-      );
-
   @override
   Widget build(BuildContext context) {
     final list = selected == 'All'
@@ -329,54 +314,44 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top bar
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
-                  child: Row(
-                    children: [
-                      dot(kOrange),
-                      dot(kGreen),
-                      dot(kBlue),
-                      const SizedBox(width: 8),
-                      const Text('CINEBOX',
-                          style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.5)),
-                    ],
-                  ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: Text('Now Showing',
+                      style: TextStyle(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5)),
                 ),
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: SectionHeader('Popular films now showing'),
+                  padding: EdgeInsets.fromLTRB(20, 2, 20, 14),
+                  child: Text('Pick a movie and book your seats',
+                      style: TextStyle(color: kGray, fontSize: 15)),
                 ),
-                // Genre tabs
+                // Genre pills
                 SizedBox(
-                  height: 44,
+                  height: 38,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     itemCount: genres.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 20),
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (context, i) {
                       final on = selected == genres[i];
                       return GestureDetector(
                         onTap: () => setState(() => selected = genres[i]),
                         child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(
-                                  color: on ? kGreen : Colors.transparent,
-                                  width: 2),
-                            ),
+                            color: on ? Colors.white : kCard,
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             genres[i],
                             style: TextStyle(
-                                color: on ? Colors.white : kText,
-                                fontWeight:
-                                    on ? FontWeight.bold : FontWeight.normal),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: on ? Colors.black : kGray),
                           ),
                         ),
                       );
@@ -385,14 +360,14 @@ class _HomePageState extends State<HomePage> {
                 ),
                 Expanded(
                   child: GridView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
                     itemCount: list.length,
                     gridDelegate:
                         const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 150,
-                      childAspectRatio: 0.6,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 12,
+                      maxCrossAxisExtent: 190,
+                      childAspectRatio: 0.58,
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 20,
                     ),
                     itemBuilder: (context, i) {
                       final m = list[i];
@@ -406,13 +381,48 @@ class _HomePageState extends State<HomePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: Tooltip(
-                                message: '${m.title} (${m.year})',
-                                child: Poster(m),
+                              child: Stack(
+                                children: [
+                                  Positioned.fill(child: Poster(m)),
+                                  Positioned(
+                                    left: 8,
+                                    bottom: 8,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.star_rounded,
+                                              color: Colors.amber, size: 14),
+                                          const SizedBox(width: 3),
+                                          Text('${m.rating}',
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Stars(m.rating, size: 13),
+                            const SizedBox(height: 10),
+                            Text(m.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 14)),
+                            const SizedBox(height: 2),
+                            Text(m.genre,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    color: kGray, fontSize: 12)),
                           ],
                         ),
                       );
@@ -428,86 +438,126 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// ---------- Screen 2: Film details ----------
+// ---------- Screen 2: Movie details ----------
 class DetailPage extends StatelessWidget {
   final Movie movie;
   const DetailPage({super.key, required this.movie});
 
+  Widget stat(String value, String label) => Expanded(
+        child: Column(
+          children: [
+            Text(value,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text(label, style: const TextStyle(color: kGray, fontSize: 12)),
+          ],
+        ),
+      );
+
+  Widget divider() =>
+      Container(width: 1, height: 28, color: Colors.white12);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('FILM', style: TextStyle(fontSize: 14, letterSpacing: 1.5))),
-      body: Narrow(
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 130,
-                        child: AspectRatio(
-                          aspectRatio: 2 / 3,
-                          child: Poster(movie),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(movie.title,
-                                style: const TextStyle(
-                                    fontSize: 22, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 4),
-                            Text('${movie.year}  •  ${movie.duration}',
-                                style: const TextStyle(color: kText)),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Stars(movie.rating, size: 18),
-                                const SizedBox(width: 8),
-                                Text('${movie.rating}',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(movie.genre,
-                                style: const TextStyle(color: kText)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  const SectionHeader('Synopsis'),
-                  const SizedBox(height: 10),
-                  Text(movie.about,
-                      style: const TextStyle(
-                          color: Color(0xFFCCD6DD), height: 1.5)),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => ShowtimePage(movie: movie)),
-                  ),
-                  child: const Text('Book tickets'),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(),
+      body: Stack(
+        children: [
+          // Soft glow at the top
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 420,
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF1B2A4A), kBg],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+          Narrow(
+            child: Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 100, 20, 20),
+                    children: [
+                      Center(
+                        child: SizedBox(
+                          width: 220,
+                          child: AspectRatio(
+                            aspectRatio: 2 / 3,
+                            child: Poster(movie, radius: 20),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(movie.title,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5)),
+                      const SizedBox(height: 6),
+                      Text(movie.genre,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: kGray, fontSize: 15)),
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: kCard,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Row(
+                          children: [
+                            stat('${movie.rating}', 'RATING'),
+                            divider(),
+                            stat('${movie.year}', 'YEAR'),
+                            divider(),
+                            stat(movie.duration, 'LENGTH'),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text('Synopsis',
+                          style: TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      Text(movie.about,
+                          style: const TextStyle(
+                              color: Color(0xFFD1D1D6),
+                              fontSize: 16,
+                              height: 1.45)),
+                    ],
+                  ),
+                ),
+                Glass(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ShowtimePage(movie: movie)),
+                        ),
+                        child: const Text('Book Tickets'),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -545,10 +595,10 @@ class _ShowtimePageState extends State<ShowtimePage> {
           children: [
             // Date strip
             SizedBox(
-              height: 76,
+              height: 78,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: 7,
                 separatorBuilder: (_, __) => const SizedBox(width: 10),
                 itemBuilder: (context, i) {
@@ -559,8 +609,8 @@ class _ShowtimePageState extends State<ShowtimePage> {
                     child: Container(
                       width: 58,
                       decoration: BoxDecoration(
-                        color: on ? kGreen : kCard,
-                        borderRadius: BorderRadius.circular(4),
+                        color: on ? Colors.white : kCard,
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -568,12 +618,12 @@ class _ShowtimePageState extends State<ShowtimePage> {
                           Text(dayNames[date.weekday - 1],
                               style: TextStyle(
                                   fontSize: 12,
-                                  color: on ? Colors.black : kText)),
+                                  color: on ? Colors.black54 : kGray)),
                           const SizedBox(height: 4),
                           Text('${date.day}',
                               style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
                                   color: on ? Colors.black : Colors.white)),
                         ],
                       ),
@@ -586,35 +636,36 @@ class _ShowtimePageState extends State<ShowtimePage> {
             // Theatres
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 children: theatres.map((t) {
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       color: kCard,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(22),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(t.name,
                             style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
+                                fontSize: 17, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
                         Text(t.area,
-                            style:
-                                const TextStyle(color: kText, fontSize: 12)),
-                        const SizedBox(height: 12),
+                            style: const TextStyle(color: kGray, fontSize: 13)),
+                        const SizedBox(height: 14),
                         Wrap(
                           spacing: 10,
                           runSpacing: 10,
                           children: t.times.map((time) {
-                            return OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: kBlue,
-                                side: const BorderSide(color: kBlue),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(4)),
+                            return TextButton(
+                              style: TextButton.styleFrom(
+                                backgroundColor: kFill,
+                                foregroundColor: Colors.white,
+                                shape: const StadiumBorder(),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 18, vertical: 10),
                               ),
                               onPressed: () => Navigator.push(
                                 context,
@@ -677,25 +728,20 @@ class _SeatPageState extends State<SeatPage> {
                 picked ? selected.remove(id) : selected.add(id);
               }),
       child: Padding(
-        padding: const EdgeInsets.all(2),
+        padding: const EdgeInsets.all(2.5),
         child: AspectRatio(
           aspectRatio: 1,
           child: Container(
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: booked
-                  ? Colors.white12
-                  : (picked ? kGreen : Colors.transparent),
-              border: Border.all(
-                color: booked
-                    ? Colors.transparent
-                    : (picked ? kGreen : kText),
-              ),
-              borderRadius: BorderRadius.circular(4),
+              color: booked ? kCard : (picked ? kBlue : kFill),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Text('${c + 1}',
+            child: Text(booked ? '' : '${c + 1}',
                 style: TextStyle(
-                    fontSize: 10, color: picked ? Colors.black : kText)),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: picked ? Colors.white : kGray)),
           ),
         ),
       ),
@@ -710,7 +756,7 @@ class _SeatPageState extends State<SeatPage> {
           SizedBox(
             width: 20,
             child: Text(String.fromCharCode(65 + r),
-                style: const TextStyle(color: kText, fontSize: 12)),
+                style: const TextStyle(color: kGray, fontSize: 12)),
           ),
           for (int c = 0; c < 10; c++) ...[
             if (c == 5) const SizedBox(width: 14),
@@ -721,20 +767,17 @@ class _SeatPageState extends State<SeatPage> {
     );
   }
 
-  Widget legend(Color fill, Color border, String label) {
+  Widget legend(Color color, String label) {
     return Row(
       children: [
         Container(
           width: 14,
           height: 14,
           decoration: BoxDecoration(
-            color: fill,
-            border: Border.all(color: border),
-            borderRadius: BorderRadius.circular(4),
-          ),
+              color: color, borderRadius: BorderRadius.circular(5)),
         ),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 12, color: kText)),
+        Text(label, style: const TextStyle(fontSize: 12, color: kGray)),
       ],
     );
   }
@@ -748,12 +791,12 @@ class _SeatPageState extends State<SeatPage> {
     return Scaffold(
       appBar: AppBar(
         title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.movie.title, style: const TextStyle(fontSize: 18)),
+            Text(widget.movie.title),
             Text(
               '${widget.theatre.name} • ${widget.date}, ${widget.time}',
-              style: const TextStyle(fontSize: 12, color: kText),
+              style: const TextStyle(
+                  fontSize: 12, color: kGray, fontWeight: FontWeight.normal),
             ),
           ],
         ),
@@ -763,99 +806,98 @@ class _SeatPageState extends State<SeatPage> {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 child: Column(
                   children: [
+                    // Screen
+                    Container(
+                      height: 5,
+                      margin: const EdgeInsets.symmetric(horizontal: 36),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('SCREEN',
+                        style: TextStyle(
+                            color: kGray, fontSize: 11, letterSpacing: 2)),
+                    const SizedBox(height: 8),
                     for (int r = 0; r < 8; r++) ...[
                       if (r == 0 || r == 3 || r == 6)
                         Padding(
-                          padding: const EdgeInsets.only(top: 12, bottom: 6),
+                          padding: const EdgeInsets.only(top: 14, bottom: 6),
                           child: Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              '₹${seatPrice(r)} • ${tiers[r ~/ 3]}'
-                                  .toUpperCase(),
+                              '₹${seatPrice(r)} • ${tiers[r ~/ 3]}',
                               style: const TextStyle(
-                                  color: kText,
-                                  letterSpacing: 1.1,
+                                  color: kGray,
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 11),
+                                  fontSize: 13),
                             ),
                           ),
                         ),
                       seatRow(r),
                     ],
-                    const SizedBox(height: 24),
-                    // Screen
-                    Container(
-                      height: 5,
-                      margin: const EdgeInsets.symmetric(horizontal: 30),
-                      decoration: BoxDecoration(
-                        color: kOrange,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text('SCREEN THIS WAY',
-                        style: TextStyle(
-                            color: kText, fontSize: 11, letterSpacing: 1.2)),
                   ],
                 ),
               ),
             ),
             // Legend
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  legend(Colors.transparent, kText, 'Available'),
-                  legend(kGreen, kGreen, 'Selected'),
-                  legend(Colors.white12, Colors.transparent, 'Sold'),
+                  legend(kFill, 'Available'),
+                  legend(kBlue, 'Selected'),
+                  legend(kCard, 'Sold'),
                 ],
               ),
             ),
             // Bottom bar
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: kCard,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          selected.isEmpty
-                              ? 'Select your seats'
-                              : '${selected.length} seat(s)',
-                          style: const TextStyle(color: kText),
-                        ),
-                        Text('₹$total',
-                            style: const TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.bold)),
-                      ],
+            Glass(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            selected.isEmpty
+                                ? 'Select your seats'
+                                : '${selected.length} seat(s)',
+                            style: const TextStyle(color: kGray),
+                          ),
+                          Text('₹$total',
+                              style: const TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.w800)),
+                        ],
+                      ),
                     ),
-                  ),
-                  FilledButton(
-                    onPressed: selected.isEmpty
-                        ? null
-                        : () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => TicketPage(
-                                  movie: widget.movie,
-                                  theatre: widget.theatre,
-                                  date: widget.date,
-                                  time: widget.time,
-                                  seats: seatList,
-                                  total: total,
+                    FilledButton(
+                      onPressed: selected.isEmpty
+                          ? null
+                          : () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TicketPage(
+                                    movie: widget.movie,
+                                    theatre: widget.theatre,
+                                    date: widget.date,
+                                    time: widget.time,
+                                    seats: seatList,
+                                    total: total,
+                                  ),
                                 ),
                               ),
-                            ),
-                    child: const Text('Pay & Book'),
-                  ),
-                ],
+                      child: const Text('Pay & Book'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -889,7 +931,7 @@ class TicketPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Your ticket'),
+        title: const Text('Your Ticket'),
         automaticallyImplyLeading: false,
       ),
       body: Narrow(
@@ -897,46 +939,46 @@ class TicketPage extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              const Icon(Icons.check_circle, color: kGreen, size: 56),
-              const SizedBox(height: 8),
-              const Text('Booking confirmed!',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
+              const Icon(Icons.check_circle_rounded, color: kGreen, size: 60),
+              const SizedBox(height: 10),
+              const Text('Booking Confirmed',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 22),
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: kCard,
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(28),
                 ),
                 child: Column(
                   children: [
                     Row(
                       children: [
                         SizedBox(
-                          width: 80,
-                          height: 120,
-                          child: Poster(movie),
+                          width: 84,
+                          height: 126,
+                          child: Poster(movie, radius: 12),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(movie.title,
                                   style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 6),
                               Text(movie.genre,
-                                  style: const TextStyle(color: kText)),
+                                  style: const TextStyle(color: kGray)),
                               Text(movie.duration,
-                                  style: const TextStyle(color: kText)),
+                                  style: const TextStyle(color: kGray)),
                             ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
                     // Dotted divider
                     Row(
                       children: List.generate(
@@ -956,19 +998,26 @@ class TicketPage extends StatelessWidget {
                     InfoRow('Theatre', '${theatre.name}, ${theatre.area}'),
                     InfoRow('Seats', seats.join(', ')),
                     InfoRow('Booking ID', bookingId),
-                    const Divider(height: 28, color: Colors.white24),
+                    const Divider(height: 30, color: Colors.white12),
                     InfoRow('Total paid', '₹$total', bold: true),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
                     // Fake barcode
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        40,
-                        (i) => Container(
-                          width: (i % 3 + 1).toDouble(),
-                          height: 40,
-                          margin: const EdgeInsets.symmetric(horizontal: 1),
-                          color: Colors.white,
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          38,
+                          (i) => Container(
+                            width: (i % 3 + 1).toDouble(),
+                            height: 44,
+                            margin: const EdgeInsets.symmetric(horizontal: 1),
+                            color: Colors.black,
+                          ),
                         ),
                       ),
                     ),
@@ -981,7 +1030,7 @@ class TicketPage extends StatelessWidget {
                 child: FilledButton(
                   onPressed: () =>
                       Navigator.popUntil(context, (route) => route.isFirst),
-                  child: const Text('Back to home'),
+                  child: const Text('Back to Home'),
                 ),
               ),
             ],
